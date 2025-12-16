@@ -1,0 +1,7 @@
+<Solution>
+  <Configurations>
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Project Path="CloudeServiceServer.vcxproj" Id="f415253f-3f7c-4685-a267-f9cf865e93df" />
+</Solution>
