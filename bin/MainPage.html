@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CloudService</title>
+    <link rel="stylesheet" href="MainPage.css">
+</head>
+<body id="background">
+    <h1 id="mainLogoServ">CloudService</h1>
+    <div id="fileContainer">
+        <table id="fileTable">
+            <thead>
+                <tr>
+                    <th>Имя файла</th>
+                    <th>Дата</th>
+                    <th>Размер</th>
+                    <th>Расширение</th>
+                </tr>
+            </thead>
+            <tbody id="fileTableBody"></tbody>
+        </table>
+    </div>
+    <button id="addButton">Add</button>
+    <input
+        type="file"
+        id="fileInput"
+        multiple
+        style="display: none;"
+    >
+    <button id="refreshButton">Refresh</button>
+    <script src="MainPage.js"></script>
+</body>
+</html>
