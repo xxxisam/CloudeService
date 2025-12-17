@@ -1,5 +1,5 @@
 #include "Server.h"
-#include <boost/asio.hpp>
+#include <boost/asio.hpp> 
 //#include <iostream>
 
 #include <thread>
@@ -22,8 +22,8 @@ void Server::startThread()
 void Server::start()
 {
     const unsigned short portNumber = 8080;
-    m_serverAcceptor = std::make_shared<Acceptor>(m_io, portNumber);
-    m_serverAcceptor->connect();
+    m_server_acceptor.reset(new Acceptor(m_io, portNumber));
+    m_server_acceptor->connect();
     startThread();
 }
 

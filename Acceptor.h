@@ -83,7 +83,7 @@ private:
 
 		if (!m_aceptanceIsStopped.load())
 		{
-			makeConnect();
+			connect();
 		}
 		else
 		{

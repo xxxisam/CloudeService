@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <memory>
 #include <boost/asio.hpp>
@@ -10,6 +10,8 @@
 #include <fstream>
 #include <string>
 #include <sstream>
+#include "File.hpp"
+#include <memory>
 
 class Session : public std::enable_shared_from_this<Session>
 {
@@ -40,6 +42,7 @@ private:
 
     //boost::beast::flat_buffer m_buffer;
     //boost::beast::http::request<boost::beast::http::string_body> m_request;
+    std::unordered_map<std::string, std::shared_ptr<FileMetaInfo>> files;
 
 
 
@@ -69,6 +72,9 @@ private:
         std::string target = std::string(request->target());
         boost::beast::http::verb method = request->method();
 
+
+        std::cout << target << "\n";
+
         if (target.empty())
             target = "/";
 
@@ -79,13 +85,18 @@ private:
             else
                 loadMainPage(request);
         }
-        else if (method == boost::beast::http::verb::post && target == "/upload")
+        else if (method == boost::beast::http::verb::post && target == "/upload/meta")
         {
             pressAddButton(request);
         }
+        /*else if (request->method() == boost::beast::http::verb::post ||
+            request->target() == "/upload/meta")
+        {
+            uploadFileMetaInfo(request);
+        }*/
         else
         {
-            std::cout << "�������� ��� �������: " << target << "\n";
+            std::cout << "Неверный вид запроса: " << target << "\n";
             auto res = std::make_shared<boost::beast::http::response<boost::beast::http::string_body>>(
                 boost::beast::http::status::not_found, request->version()
             );
@@ -198,8 +209,15 @@ private:
 
     void pressAddButton(std::shared_ptr<boost::beast::http::request<boost::beast::http::dynamic_body>> request)
     {
+        FileMetaInfo file = uploadFileMetaInfo(request);
+
+
+        std::filesystem::path folder = "D:/S/Server";
+        std::filesystem::path filePath = folder / file.fullName;
+
+
         auto& body = request->body();
-        std::ofstream out("D:/S/Server/upload.txt", std::ios::binary);
+        std::ofstream out(filePath, std::ios::binary);
 
         for (auto const& buffer : body.data())
             out.write(reinterpret_cast<const char*>(buffer.data()), buffer.size());
@@ -270,4 +288,36 @@ private:
         json << "]";
         return json.str();
     }
+
+    FileMetaInfo uploadFileMetaInfo(std::shared_ptr<boost::beast::http::request<boost::beast::http::dynamic_body>> request)
+    {
+        // Тело запроса → строка
+        std::string body = boost::beast::buffers_to_string(request->body().data());
+
+        FileMetaInfo info;
+
+        try
+        {
+            // Парсим JSON
+            nlohmann::json json = nlohmann::json::parse(body);
+
+            info = json.get<FileMetaInfo>();
+
+            files[info.hash] = std::make_shared<FileMetaInfo>(info);
+
+            /*std::cout << "Meta received:\n";
+            std::cout << "  Name: " << info.name << "\n";
+            std::cout << "  Size: " << info.size << "\n";
+            std::cout << "  Hash: " << info.hash << "\n";*/
+        }
+        catch (const std::exception& e)
+        {
+            std::cerr << "uploadFileMetaInfo error: " << e.what() << "\n";
+        }
+
+
+        return info;
+        
+    }
+
 };
