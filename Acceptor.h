@@ -9,9 +9,9 @@
 class Acceptor
 {
 public:
-	Acceptor(boost::asio::io_context& io, unsigned int portNumber) : m_io(io), m_acceptor(m_io, boost::asio::ip::tcp::endpoint(boost::asio::ip::tcp::v4(), portNumber)) //m_socket(m_io)
+	Acceptor(boost::asio::io_context& io, unsigned int portNumber) : m_io(io), m_acceptor(m_io, boost::asio::ip::tcp::endpoint(boost::asio::ip::tcp::v4(), portNumber)), m_aceptanceIsStopped(false) //m_socket(m_io)
 	{
-		std::atomic<bool> m_aceptanceIsStopped = false;
+		std::cout << "Server started at http://localhost:8080\n";
 	}
 
 	void connect()
@@ -39,7 +39,12 @@ private:
 				if (!ec)
 				{
 					std::shared_ptr<std::string> tempmsg(std::make_shared<std::string>("Successful connection!"));
-					std::cout << "Server started at http://localhost:8080\n";
+
+					std::cout << "Remote ENDPOINT: - " << socket->remote_endpoint().address().to_string() << "\n";
+					std::cout << "Remote PORT: - " << socket->remote_endpoint().port() << "\n";
+					std::cout << "Local ENDPOINT: - " << socket->local_endpoint().address().to_string() << "\n";
+					std::cout << "Local PORT: - " << socket->local_endpoint().port() << "\n";
+					
 
 					std::cout << *tempmsg << "\n";
 
@@ -102,4 +107,3 @@ private:
 	boost::beast::flat_buffer m_beastBuf;
 	boost::beast::http::request<boost::beast::http::string_body> m_request;
 };
-

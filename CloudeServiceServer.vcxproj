@@ -105,7 +105,8 @@
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>D:\Prog\boost_1_89_0\boost;D:\Prog\boost_1_89_0;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\User\source\repos\CloudeService\CloudeServiceServer\bin\sql;D:\Prog\boost_1_89_0\boost;D:\Prog\boost_1_89_0;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -130,8 +131,13 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="Acceptor.h" />
+    <ClInclude Include="defaultPath.h" />
     <ClInclude Include="File.hpp" />
+    <ClInclude Include="FileDataBase.h" />
     <ClInclude Include="FileManager.h" />
+    <ClInclude Include="sqlDataBaseRequest.h" />
+    <ClInclude Include="MultipartParser.h" />
+    <ClInclude Include="Parse.h" />
     <ClInclude Include="Server.h" />
     <ClInclude Include="ServerService.h" />
     <ClInclude Include="Session.hpp" />
@@ -140,7 +146,10 @@
   <ItemGroup>
     <ClCompile Include="Acceptor.cpp" />
     <ClCompile Include="Beast.cpp" />
+    <ClCompile Include="bin\sql\sqlite3.c" />
+    <ClCompile Include="FileDataBase.cpp" />
     <ClCompile Include="FileManager.cpp" />
+    <ClCompile Include="Parse.cpp" />
     <ClCompile Include="ServerMain.cpp" />
     <ClCompile Include="Server.cpp" />
     <ClCompile Include="ServerService.cpp" />
