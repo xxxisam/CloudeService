@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Страница входа</title>
-  <link rel="stylesheet" href="LogPage.css">
+  <link rel="stylesheet" href="/css/LogPage.css">
 </head>
 <body>
   <main class="card" role="main">
@@ -21,13 +21,15 @@
         <input id="password" name="password" type="password" placeholder="Введите пароль" required autocomplete="current-password" />
       </div>
 
-      
-      <a class="muted-link" href="#">Регистрация (заглушка)</a>
+      <div id="formMessage" class="form-message"></div>
 
-      <button type="submit">Войти</button>
+      <a class="muted-link" href="RegistrationPage.html">Регистрация</a>
+
+      <button type="button" onclick="sendLogin()">Войти</button>
     </form>
 
     <div class="foot">Если у вас нет аккаунта — используйте ссылку регистрации выше.</div>
   </main>
+  <script src="js/LogPage.js"></script>
 </body>
 </html>

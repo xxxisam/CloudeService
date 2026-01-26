@@ -183,9 +183,19 @@ function createDeleteButton(file) {
 
     btn.addEventListener("click", async () => {
         try {
-            const res = await fetch(`/delete?hash=${file.hash}`, { method: "DELETE" });
+            const res = await fetch("/delete", {
+                method: "DELETE",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    hash: file.hash,
+                    filename: file.fullName
+                })
+            });
+
             if (res.ok) {
-                refreshFileList(); // централизованный вызов обновления
+                refreshFileList();
             } else {
                 console.error("Ошибка удаления");
             }

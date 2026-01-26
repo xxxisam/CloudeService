@@ -15,7 +15,7 @@ public:
 
 private:
 	boost::asio::io_context m_io;
-	//std::shared_ptr<boost::asio::executor_work_guard<boost::asio::io_context::executor_type>> m_executor_work_guard;
+	std::shared_ptr<boost::asio::executor_work_guard<boost::asio::io_context::executor_type>> m_executor_work_guard;
 	//std::shared_ptr<Acceptor> m_serverAcceptor;
 	std::unique_ptr<Acceptor> m_server_acceptor;
 

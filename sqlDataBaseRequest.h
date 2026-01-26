@@ -11,4 +11,5 @@ struct sqlDataBaseRequest
 	static inline const std::string sqlFind = "/find";
 	static inline const std::string sqlDelete = "/delete";
 	static inline const std::string sqlSync = "/sync";
+	static inline const std::string sqlGetServerPath = "/getFileServerPath";
 };

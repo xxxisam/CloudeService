@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -105,13 +105,14 @@
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>C:\Users\User\source\repos\CloudeService\CloudeServiceServer\bin\sql;D:\Prog\boost_1_89_0\boost;D:\Prog\boost_1_89_0;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>D:\Prog\CyproPP\CryptoPP\x64\Output\Release;D:\Prog\CyproPP\CryptoPP\x64\Output\Debug;D:\Prog\CyproPP;C:\Users\User\source\repos\CloudeService\CloudeServiceServer\bin\sql;D:\Prog\boost_1_89_0\boost;D:\Prog\boost_1_89_0;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>D:\Prog\boost_1_89_0\boost;D:\Prog\boost_1_89_0;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>D:\Prog\CyproPP\CryptoPP\x64\Output\Release;D:\Prog\CyproPP\CryptoPP\x64\Output\Debug;D:\Prog\CyproPP;D:\Prog\boost_1_89_0\boost;D:\Prog\boost_1_89_0;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>cryptlib.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -131,28 +132,39 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="Acceptor.h" />
+    <ClInclude Include="DataBase.h" />
+    <ClInclude Include="DataBaseUtility.hpp" />
     <ClInclude Include="defaultPath.h" />
     <ClInclude Include="File.hpp" />
     <ClInclude Include="FileDataBase.h" />
     <ClInclude Include="FileManager.h" />
+    <ClInclude Include="HashFileTable.h" />
+    <ClInclude Include="SessionManager.h" />
     <ClInclude Include="sqlDataBaseRequest.h" />
     <ClInclude Include="MultipartParser.h" />
     <ClInclude Include="Parse.h" />
     <ClInclude Include="Server.h" />
     <ClInclude Include="ServerService.h" />
     <ClInclude Include="Session.hpp" />
+    <ClInclude Include="TokenDataBase.h" />
     <ClInclude Include="User.hpp" />
+    <ClInclude Include="UserDataBase.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Acceptor.cpp" />
     <ClCompile Include="Beast.cpp" />
     <ClCompile Include="bin\sql\sqlite3.c" />
+    <ClCompile Include="DataBase.cpp" />
     <ClCompile Include="FileDataBase.cpp" />
     <ClCompile Include="FileManager.cpp" />
+    <ClCompile Include="HashFileTable.cpp" />
     <ClCompile Include="Parse.cpp" />
     <ClCompile Include="ServerMain.cpp" />
     <ClCompile Include="Server.cpp" />
     <ClCompile Include="ServerService.cpp" />
+    <ClCompile Include="SessionManager.cpp" />
+    <ClCompile Include="TokenDataBase.cpp" />
+    <ClCompile Include="UserDataBase.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

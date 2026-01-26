@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Регистрация</title>
+  <link rel="stylesheet" href="/css/LogPage.css">
+</head>
+<body>
+  <main class="card" role="main">
+    <h1>Регистрация</h1>
+
+    <form id="registrationForm" method="post" aria-label="Форма регистрации">
+  <div class="field">
+    <label for="login">Ник</label>
+    <input id="login" name="login" type="text" required />
+  </div>
+
+  <div class="field">
+    <label for="password">Пароль</label>
+    <input id="password" name="password" type="password" required />
+  </div>
+
+  <div class="field">
+    <label for="password_repeat">Повторите пароль</label>
+    <input id="password_repeat" name="password_repeat" type="password" required />
+  </div>
+
+  <button type="submit">Зарегистрироваться</button>
+</form>
+
+<div id="formMessage" class="form-message"></div>
+    <a class="muted-link" href="/LogPage.html">← Назад ко входу</a>
+
+    <div class="foot">
+      Уже есть аккаунт? Вернитесь на страницу входа.
+    </div>
+  </main>
+  <script src="js/RegistrationPage.js"></script>
+</body>
+</html>
