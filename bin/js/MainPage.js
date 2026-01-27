@@ -57,6 +57,7 @@ async function uploadFile(file) {
 document.addEventListener("DOMContentLoaded", () => {
   const addButton = document.getElementById("addButton");
   const refreshButton = document.getElementById("refreshButton");
+  const logoutButton = document.getElementById("logoutButton");
   const fileInput = document.getElementById("fileInput");
 
   addButton.addEventListener("click", () => fileInput.click());
@@ -78,6 +79,8 @@ document.addEventListener("DOMContentLoaded", () => {
       alert("Ошибка загрузки");
     }
   });
+
+ logoutButton.addEventListener("click", logout);
 });
 
 function refreshFileList() {
@@ -205,4 +208,20 @@ function createDeleteButton(file) {
     });
 
     return btn;
+}
+
+async function logout() {
+  try {
+    const res = await fetch("/logout", { method: "POST" });
+
+    if (res.ok) {
+      window.location.href = "/LogPage.html";
+    } else {
+      console.error("Logout failed");
+      alert("Ошибка выхода");
+    }
+  } catch (err) {
+    console.error(err);
+    alert("Ошибка соединения с сервером");
+  }
 }

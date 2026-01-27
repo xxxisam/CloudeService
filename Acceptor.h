@@ -122,6 +122,4 @@ private:
 
 	
 	std::vector<SessionManager::Token> m_users_in_session;
-	boost::beast::flat_buffer m_beastBuf;
-	boost::beast::http::request<boost::beast::http::string_body> m_request;
 };

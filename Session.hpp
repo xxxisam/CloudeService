@@ -446,8 +446,13 @@ private:
             }
             else if(target == "/registration")
             {
-                std::cout << "[Session][method: POST. target: register]!!!!!!!))))____)_)!!!!!!!!!)))_)_!)!\n";
+                std::cout << "[Session][method: POST. target: register]\n";
                 registration(request);
+            }
+            else if (target == "/logout")
+            {
+                std::cout << "[Session][method: POST. target: logout]\n";
+                logout(request);
             }
         }
         else if (method == boost::beast::http::verb::delete_)
@@ -685,6 +690,7 @@ private:
                 std::cout << "[Session][login] login creating auth token!\n";
                 createAuthToken(m_token, user);
                 DataBaseUtility::UserDBResult ret = tokenDB.delToken(tempToken);
+               
                 if (ret == DataBaseUtility::UserDBResult::OK)
                 {
                     std::cout << "[Session][login] successful deletion! OK\n";
@@ -844,6 +850,49 @@ private:
                 }
             });
     }
+
+    void logout(std::shared_ptr<boost::beast::http::request<boost::beast::http::dynamic_body>> request)
+    {
+        std::cout << "[Session][logout]\n";
+
+        if (checkSession(request))
+        {
+            if (m_token.token == "")
+            {
+                std::cout << "[Session][logout] generate Token\n";
+                m_token.token = generateToken();
+            }
+        }
+        if (tokenDB.delToken(m_token) != DataBaseUtility::UserDBResult::OK)
+        {
+            std::cout << "[Session][logout]Something gone wrong\n";
+        }
+
+        SessionManager::Token guestLogaoutToken;
+        createGuestToken(guestLogaoutToken);
+        std::cout << "[Session][logout] createGuestToken check\n";
+        SessionManager::printTokenInfo(guestLogaoutToken);
+
+        auto res = std::make_shared<boost::beast::http::response<boost::beast::http::dynamic_body>>(boost::beast::http::status::ok, request->version());
+        res->set(boost::beast::http::field::set_cookie, guestLogaoutToken.token);
+
+        boost::beast::http::async_write(
+            m_socket,
+            *res,
+            [self = shared_from_this(), res](const boost::beast::error_code& ec, size_t bytes_transferred)
+            {
+                if (!ec && res->keep_alive())
+                {
+                    self->getRequest();
+                }
+                else
+                {
+                    std::cerr << "async_write error: " << ec.message() << "\n";
+                }
+            }
+        );
+    }
+
 
     void upload(std::shared_ptr<boost::beast::http::request<boost::beast::http::dynamic_body>> request)
     {
@@ -1060,6 +1109,8 @@ private:
         hashDB.getRequest(sqlDataBaseRequest::sqlPrint);
         std::cout << "[Session][pressRefreshButton]UserDB Print\n";
         userDB.getRequest(sqlDataBaseRequest::sqlPrint);
+        std::cout << "[Session][pressRefreshButton]UserDB Print\n";
+        tokenDB.printTokenTable();
         
         res->set(boost::beast::http::field::content_type, "application/json");
         res->body() = json.dump(4);

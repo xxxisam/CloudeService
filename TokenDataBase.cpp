@@ -345,22 +345,24 @@ bool TokenDataBase::deleteToken(const SessionManager::Token& token)
     }
 
     sqlite3_stmt* stmt = nullptr;
+  
+    std::string sqlDeleteToken = "DELETE FROM " + TokenDataBaseTable::tableName + " WHERE " + TokenDataBaseTable::columnToken + " = ?;";
 
-    std::string sqlDeleteToken = "DELETE FROM " + TokenDataBaseTable::tableName + " WHERE " + TokenDataBaseTable::columnToken + "=?;";
-
-    int rc = sqlite3_prepare_v2(db, sqlDeleteToken.c_str(), 1, &stmt, nullptr);
+    int rc = sqlite3_prepare_v2(db, sqlDeleteToken.c_str(), -1, &stmt, nullptr);
 
     if (rc != SQLITE_OK)
     {
-        std::cerr << "[SQL][File][Delete Prepare error: " << sqlite3_errmsg(db) << "\n";
+        std::cerr << "[SQL][Token][Delete Prepare error: " << sqlite3_errmsg(db) << "\n";
         return false;
     }
 
-    int brc = sqlite3_bind_text(stmt, 1, token.token.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 1, token.token.c_str(), -1, SQLITE_TRANSIENT);
+
+    int brc = sqlite3_step(stmt);
 
     if (brc != SQLITE_DONE)
     {
-        std::cerr << "[SQL][File][Delete error: " << sqlite3_errmsg(db) << "\n";
+        std::cerr << "[SQL][Token][Delete error: " << sqlite3_errmsg(db) << "\n";
         sqlite3_finalize(stmt);
         return false;
     }
@@ -370,7 +372,7 @@ bool TokenDataBase::deleteToken(const SessionManager::Token& token)
     sqlite3_finalize(stmt);
 
 
-    return deletedRows == 1;
+    return deletedRows >  0;
 }
 
 bool TokenDataBase::getLogin(const SessionManager::Token& token)
@@ -432,6 +434,7 @@ bool TokenDataBase::isThisTokenExisted(const std::string& token)
     sqlite3_bind_text(stmt, 1, token.c_str(), -1, SQLITE_TRANSIENT);
 
     bool exists = (sqlite3_step(stmt) == SQLITE_ROW);
+    std::cout << "[SQL][Token][isThisTokenExisted] exist: " << std::boolalpha << exists << "\n";
 
     sqlite3_finalize(stmt);
     return exists;
@@ -496,16 +499,16 @@ bool TokenDataBase::takeTokenInfo(SessionManager::Token& token)
 DataBaseUtility::UserDBResult TokenDataBase::delToken(const SessionManager::Token& token)
 {
     std::cout << "[SQL][TOKEN][delToken] findByLoginIfExist() \n";
-    if (!isThisTokenExisted(token.token))
+    if (isThisTokenExisted(token.token))
     {
-        std::cout << "[SQL][TOKEN][delToken] This token doesnt existed \n";
+        std::cout << "[SQL][TOKEN][delToken] This token exist\n";
         std::cout << "[SQL][TOKEN][delToken]deleteToken(token); \n";
         deleteToken(token);
         return DataBaseUtility::UserDBResult::OK;
     }
     else
     {
-        std::cout << "[SQL][TOKEN][delToken] Tsis token already existed \n";
+        std::cout << "[SQL][TOKEN][delToken] TOKEN_DOESNT_EXIST \n";
         return DataBaseUtility::UserDBResult::TOKEN_DOESNT_EXIST;
     }
 }
