@@ -7,20 +7,32 @@
 #include "SessionManager.h"
 #include "UserDataBase.h"
 #include "TokenDataBase.h"
+#include <boost/asio/ssl/context.hpp>
+#include "server_certificate.hpp"
 
-class Acceptor
+class Acceptor : public std::enable_shared_from_this<Acceptor>
 {
 public:
-	Acceptor(boost::asio::io_context& io, unsigned int portNumber, TokenDataBase& tokenDB, UserDataBase& userDB) : m_io(io), m_acceptor(m_io, boost::asio::ip::tcp::endpoint(boost::asio::ip::tcp::v4(), portNumber)), m_aceptanceIsStopped(false), m_tokenDB(tokenDB), m_userDB(userDB)
+	Acceptor(boost::asio::io_context& io, boost::asio::ssl::context& ctx, unsigned int portNumber, TokenDataBase& tokenDB, UserDataBase& userDB) : m_io(io), m_acceptor(m_io, boost::asio::ip::tcp::endpoint(boost::asio::ip::tcp::v4(), portNumber)), m_aceptanceIsStopped(false), m_ctx(ctx), m_tokenDB(tokenDB), m_userDB(userDB)
 	{
+		boost::beast::error_code ec;
 		std::cout << "Server started at http://localhost:8080\n";
 		m_tokenDB.start();
 		m_userDB.start();
+		m_acceptor.set_option(boost::asio::socket_base::reuse_address(true), ec);
+		ctx.use_certificate_file(defPath::defaultPath::sertificateFile.string(), boost::asio::ssl::context::file_format::pem);
+		ctx.use_private_key_file(defPath::defaultPath::sertificateKeyFile.string(), boost::asio::ssl::context::file_format::pem);
 	}
 
 	void connect()
 	{
 		std::cout << "[Acceptor] connect\n";
+		// The new connection gets its own strand
+		/*m_acceptor.async_accept(
+			boost::asio::make_strand(m_io),
+			boost::beast::bind_front_handler(
+				&Acceptor::onAccept,
+				shared_from_this()));*/
 		makeConnect();
 	}
 
@@ -31,13 +43,22 @@ private:
 	{
 		std::cout << "[Acceptor] make connect\n";
 		std::shared_ptr<boost::asio::ip::tcp::socket> socket = std::make_shared<boost::asio::ip::tcp::socket>(m_io);
-
 		boost::system::error_code ec;
 
 		if (ec)
 		{
 			std::cout << "[Acceptor]Server socket opening error: " << ec.what() << "\n";
 		}
+
+		m_acceptor.set_option(boost::beast::net::socket_base::reuse_address(true), ec);
+
+		if (ec)
+		{
+			std::cout << "[Acceptor][makeConnect] fail set opinion \n";
+			return;
+		}
+		
+
 		m_acceptor.async_accept(
 			*socket,
 			[this, socket](const boost::system::error_code& ec)
@@ -50,7 +71,7 @@ private:
 					std::cout << "[Acceptor]Remote PORT: - " << socket->remote_endpoint().port() << "\n";
 					std::cout << "[Acceptor]Local ENDPOINT: - " << socket->local_endpoint().address().to_string() << "\n";
 					std::cout << "[Acceptor]Local PORT: - " << socket->local_endpoint().port() << "\n";
-					
+
 
 					std::cout << *tempmsg << "\n";
 
@@ -68,13 +89,15 @@ private:
 							}
 						}
 					);*/
+
+					
 					try {
 						onAccept(ec, socket);
 					}
 					catch (const std::exception& erc)
 					{
 						std::cout << "[Acceptor] Session start error: " << erc.what() << "\n";
-					} 
+					}
 				}
 				else
 				{
@@ -100,7 +123,7 @@ private:
 		if (!ec)
 		{
 			std::cout << "[Acceptor] onAccept start session\n";
-			std::shared_ptr<Session> session = std::make_shared<Session>(std::move(*sock), m_userDB, m_tokenDB);
+			std::shared_ptr<Session> session = std::make_shared<Session>(std::move(*sock), m_ctx, m_userDB, m_tokenDB);
 			session->start();
 		}
 		else
@@ -110,7 +133,8 @@ private:
 	}
 
 private:
-	boost::asio::io_context& m_io; 
+	boost::asio::io_context& m_io;
+	boost::asio::ssl::context& m_ctx;
 	boost::asio::ip::tcp::acceptor m_acceptor;
 	//boost::asio::ip::tcp::socket m_socket;
 	std::atomic<bool> m_aceptanceIsStopped;
@@ -120,6 +144,5 @@ private:
 	TokenDataBase& m_tokenDB;
 	UserDataBase& m_userDB;
 
-	
 	std::vector<SessionManager::Token> m_users_in_session;
 };

@@ -14,7 +14,7 @@ document.getElementById("registrationForm").addEventListener("submit", async (e)
     }
 
     try {
-        const res = await fetch("/registration", {
+        const res = await fetch("https://localhost:8080/registration", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ login, password, password_repeat })

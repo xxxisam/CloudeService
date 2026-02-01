@@ -33,7 +33,7 @@ async function uploadFile(file) {
     formData.append("file", chunk); // бинарные данные
 
     // 3. Один запрос
-    const res = await fetch("/upload", {
+    const res = await fetch("https://localhost:8080/upload", {
       method: "POST",
       body: formData,
     });

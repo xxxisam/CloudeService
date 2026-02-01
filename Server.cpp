@@ -52,8 +52,15 @@ void Server::start()
     TokenDataBase& tokenDB = TokenDataBase::getInstance();
     userDB.start();
     tokenDB.start();
+    try {
+        load_server_certificate(m_ctx);
+    }
+    catch (const std::exception& e) {
+        std::cerr << "[Acceptor][makeConnect] Failed : " << e.what() << "\n";
+        return;
+    }
 
-    m_server_acceptor.reset(new Acceptor(m_io, portNumber, tokenDB, userDB));
+    m_server_acceptor.reset(new Acceptor(m_io, m_ctx, portNumber, tokenDB, userDB));
     m_server_acceptor->connect();
     startThread();
 }

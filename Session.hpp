@@ -32,26 +32,196 @@
 #include <CryptoPP/filters.h>
 #include <beast/http/fields.hpp>
 #include <beast/http/field.hpp>
+#include <boost/asio/ssl/context.hpp>
+#include <beast/core/basic_stream.hpp>
+#include <beast/core/tcp_stream.hpp>
+#include <boost/asio/ssl.hpp>
+
+inline boost::beast::string_view
+mime_type(boost::beast::string_view path)
+{
+    using boost::beast::iequals;
+    auto const ext = [&path]
+        {
+            auto const pos = path.rfind(".");
+            if (pos == boost::beast::string_view::npos)
+                return boost::beast::string_view{};
+            return path.substr(pos);
+        }();
+    if (iequals(ext, ".htm"))  return "text/html";
+    if (iequals(ext, ".html")) return "text/html";
+    if (iequals(ext, ".php"))  return "text/html";
+    if (iequals(ext, ".php"))  return "text/html";
+    if (iequals(ext, ".css"))  return "text/css";
+    if (iequals(ext, ".txt"))  return "text/plain";
+    if (iequals(ext, ".js"))   return "application/javascript";
+    if (iequals(ext, ".json")) return "application/json";
+    if (iequals(ext, ".xml"))  return "application/xml";
+    if (iequals(ext, ".swf"))  return "application/x-shockwave-flash";
+    if (iequals(ext, ".flv"))  return "video/x-flv";
+    if (iequals(ext, ".png"))  return "image/png";
+    if (iequals(ext, ".jpe"))  return "image/jpeg";
+    if (iequals(ext, ".jpeg")) return "image/jpeg";
+    if (iequals(ext, ".jpg"))  return "image/jpeg";
+    if (iequals(ext, ".gif"))  return "image/gif";
+    if (iequals(ext, ".bmp"))  return "image/bmp";
+    if (iequals(ext, ".ico"))  return "image/vnd.microsoft.icon";
+    if (iequals(ext, ".tiff")) return "image/tiff";
+    if (iequals(ext, ".tif"))  return "image/tiff";
+    if (iequals(ext, ".svg"))  return "image/svg+xml";
+    if (iequals(ext, ".svgz")) return "image/svg+xml";
+    return "application/text";
+}
 
 
+inline std::string
+path_cat(
+    boost::beast::string_view base,
+    boost::beast::string_view path)
+{
+    if (base.empty())
+        return std::string(path);
+    std::string result(base);
+#ifdef BOOST_MSVC
+    char constexpr path_separator = '\\';
+    if (result.back() == path_separator)
+        result.resize(result.size() - 1);
+    result.append(path.data(), path.size());
+    for (auto& c : result)
+        if (c == '/')
+            c = path_separator;
+#else
+    char constexpr path_separator = '/';
+    if (result.back() == path_separator)
+        result.resize(result.size() - 1);
+    result.append(path.data(), path.size());
+#endif
+    return result;
+}
+
+template <class Body, class Allocator>
+boost::beast::http::message_generator
+handle_request(
+    boost::beast::string_view doc_root,
+    boost::beast::http::request<Body, boost::beast::http::basic_fields<Allocator>>&& req)
+{
+    std::cout << "[Session][handle_request] doc_root " << doc_root << "\n";
+    std::cout << "[Session][handle_request] req \n" << req << "\n end of req\n";
+
+    // Returns a bad request response
+    auto const bad_request =
+        [&req](boost::beast::string_view why)
+        {
+            std::cout << "[Session][handle_request] why " << why << "\n";
+            boost::beast::http::response<boost::beast::http::string_body> res{ boost::beast::http::status::bad_request, req.version() };
+            res.set(boost::beast::http::field::server, BOOST_BEAST_VERSION_STRING);
+            res.set(boost::beast::http::field::content_type, "text/html");
+            res.keep_alive(req.keep_alive());
+            res.body() = std::string(why);
+            res.prepare_payload();
+            return res;
+        };
+
+    // Returns a not found response
+    auto const not_found =
+        [&req](boost::beast::string_view target)
+        {
+            boost::beast::http::response<boost::beast::http::string_body> res{ boost::beast::http::status::not_found, req.version() };
+            res.set(boost::beast::http::field::server, BOOST_BEAST_VERSION_STRING);
+            res.set(boost::beast::http::field::content_type, "text/html");
+            res.keep_alive(req.keep_alive());
+            res.body() = "The resource '" + std::string(target) + "' was not found.";
+            res.prepare_payload();
+            return res;
+        };
+
+    // Returns a server error response
+    auto const server_error =
+        [&req](boost::beast::string_view what)
+        {
+            boost::beast::http::response<boost::beast::http::string_body> res{ boost::beast::http::status::internal_server_error, req.version() };
+            res.set(boost::beast::http::field::server, BOOST_BEAST_VERSION_STRING);
+            res.set(boost::beast::http::field::content_type, "text/html");
+            res.keep_alive(req.keep_alive());
+            res.body() = "An error occurred: '" + std::string(what) + "'";
+            res.prepare_payload();
+            return res;
+        };
+
+    // Make sure we can handle the method
+    if (req.method() != boost::beast::http::verb::get &&
+        req.method() != boost::beast::http::verb::head)
+        return bad_request("Unknown HTTP-method");
+
+    // Request path must be absolute and not contain "..".
+    if (req.target().empty() ||
+        req.target()[0] != '/' ||
+        req.target().find("..") != boost::beast::string_view::npos)
+        return bad_request("Illegal request-target");
+
+    // Build the path to the requested file
+    std::string path = path_cat(doc_root, req.target());
+    if (req.target().back() == '/')
+        path.append("LogPage.html");
+
+    // Attempt to open the file
+    boost::beast::error_code ec;
+    boost::beast::http::file_body::value_type body;
+    body.open(path.c_str(), boost::beast::file_mode::scan, ec);
+
+    // Handle the case where the file doesn't exist
+    if (ec == boost::beast::errc::no_such_file_or_directory)
+        return not_found(req.target());
+
+    // Handle an unknown error
+    if (ec)
+        return server_error(ec.message());
+
+    // Cache the size since we need it after the move
+    auto const size = body.size();
+
+    // Respond to HEAD request
+    if (req.method() == boost::beast::http::verb::head)
+    {
+        boost::beast::http::response<boost::beast::http::empty_body> res{ boost::beast::http::status::ok, req.version() };
+        res.set(boost::beast::http::field::server, BOOST_BEAST_VERSION_STRING);
+        res.set(boost::beast::http::field::content_type, mime_type(path));
+        res.content_length(size);
+        res.keep_alive(req.keep_alive());
+        return res;
+    }
+
+    // Respond to GET request
+    boost::beast::http::response<boost::beast::http::file_body> res{
+        std::piecewise_construct,
+        std::make_tuple(std::move(body)),
+        std::make_tuple(boost::beast::http::status::ok, req.version()) };
+    res.set(boost::beast::http::field::server, BOOST_BEAST_VERSION_STRING);
+    res.set(boost::beast::http::field::content_type, mime_type(path));
+    res.content_length(size);
+    res.keep_alive(req.keep_alive());
+    return res;
+}
 
 class Session : public std::enable_shared_from_this<Session>
 {
 public:
-    Session(boost::asio::ip::tcp::socket socket, UserDataBase& uDB, TokenDataBase& tDB) : m_socket(std::move(socket)), fileDB(FileDataBase::getInstance()), hashDB(HashDataBase::getInstance()), userDB(uDB), tokenDB(tDB), m_token()
+    Session(boost::asio::ip::tcp::socket&& socket, boost::beast::net::ssl::context& ctx, UserDataBase& uDB, TokenDataBase& tDB) : m_stream(std::move(socket), ctx), /*m_ctx(std::move(ctx)), m_stream(std::move(socket), m_ctx),*/ fileDB(FileDataBase::getInstance()), hashDB(HashDataBase::getInstance()), userDB(uDB), tokenDB(tDB), m_token()
     {
 
     }
 
     void start()
     {
+
+
         hashDB.start();
         fileDB.start();
         try
         {
             std::cout << "getRequest\n";
 
-            getRequest();
+            boost::asio::dispatch(m_stream.get_executor(), boost::beast::bind_front_handler(&Session::on_run, shared_from_this()));
         }
         catch (const std::exception& ec)
         {
@@ -72,12 +242,31 @@ public:
         }
     }
 
+    void on_run()
+    {
+        boost::beast::get_lowest_layer(m_stream).expires_after(std::chrono::seconds(30));
+
+        m_stream.async_handshake(boost::asio::ssl::stream_base::server, 
+            boost::beast::bind_front_handler(&Session::on_handshake, shared_from_this()));
+    }
+
 private:
-    boost::asio::ip::tcp::socket m_socket;
+    std::shared_ptr<boost::asio::ip::tcp::socket> m_socket;
+    boost::asio::ssl::stream<boost::beast::tcp_stream> m_stream;
+   /* boost::beast::net::ssl::context m_ctx;*/
+    /*boost::beast::net::ssl::stream<boost::beast::tcp_stream> m_stream;*/
     std::shared_ptr<User::User> m_user;
     std::filesystem::path m_serverFolder;
     std::string m_loginUser;
     SessionManager::Token m_token;
+
+
+    boost::beast::http::request<boost::beast::http::dynamic_body> m_request;
+    boost::beast::flat_buffer m_flat_buffer;
+
+
+
+
 
     //DBS
     FileDataBase& fileDB;
@@ -94,22 +283,135 @@ private:
     FileDataBase* filedb;
 
 
+    void on_handshake(boost::beast::error_code ec)
+    {
+        if (ec)
+        {
+            std::cout << " Handshake error: " << ec.message() << "\n";
+        }
+        std::cout << "HandShake\n";
+
+        //getRequest();
+        do_read();
+    }
+
+    void do_read()
+    {
+        std::cout << "[Session][do_read] \n";
+        m_request = {};
+
+        boost::beast::get_lowest_layer(m_stream).expires_after(std::chrono::seconds(30));
+        std::cout << "[Session][do_read] async_read\n";
+        boost::beast::http::async_read(m_stream, m_flat_buffer, m_request, boost::beast::bind_front_handler(&Session::on_read, shared_from_this()));
 
 
+    }
+
+    void on_read(
+        boost::beast::error_code ec,
+        std::size_t bytest_transferred
+    )
+    {
+        printRequest(m_request);
+        std::cout << "[Session][on_read] \n";
+        std::cout << "[Session][on_read] before ec!\n";
+        std::cout << "[Session][on_read] Bytest_trasferred " << bytest_transferred << "\n";
+
+        if (ec)
+        {
+            std::cout << "[Session][on_read] Fail 1 " << ec.message() << "\n";
+        }
+        else
+        {
+            std::cout << "[Session][on_read] Fine!\n";
+        }
+
+        boost::ignore_unused(bytest_transferred);
+
+        if (ec == boost::beast::http::error::end_of_stream)
+        {
+            std::cout << "[Session][on_read] endOfStream\n";
+            return do_close();
+        }
+
+        if (ec)
+        {
+            std::cout << "[Session][on_read] Fail 2 " << ec.message() << "\n";
+        }
+        else
+        {
+            std::cout << "[Session][on_read] Fine!\n";
+        }
+
+        if (m_request.target() == "/login") login(std::make_shared<boost::beast::http::request<boost::beast::http::dynamic_body>>(m_request));
+        else response(handle_request(defPath::defaultPath::serverBin.string(), std::move(m_request)));
+        
+    }
+
+    void response(boost::beast::http::message_generator&& msg)
+    {
+        std::cout << "[Session][response]\n";
+        bool keep_alive = msg.keep_alive();
+
+        boost::beast::async_write(m_stream, std::move(msg), boost::beast::bind_front_handler(&Session::on_write, this->shared_from_this(), keep_alive));
+    }
+
+    void on_write(bool keep_alive, boost::beast::error_code ec, std::size_t transferred)
+    {
+        std::cout << "[Session][on_write]\n";
+        boost::ignore_unused(transferred);
+
+        if (ec)
+            std::cout << "[Session][on_write] Fail: " << ec.message() << "\n";
+
+        if (!keep_alive)
+        {
+            std::cout << "[Session][on_write] Error:  This means we should close the connection, usually because the response indicated the Connection: close semantic.:\n";
+        }
+
+        do_read();
+    }
+
+    void do_close()
+    {
+        // Set the timeout.
+        boost::beast::get_lowest_layer(m_stream).expires_after(std::chrono::seconds(30));
+
+        // Perform the SSL shutdown
+        m_stream.async_shutdown(
+            boost::beast::bind_front_handler(
+                &Session::on_shutdown,
+                shared_from_this()));
+    }
+
+    void
+        on_shutdown(boost::beast::error_code ec)
+    {
+        if (ec)
+        {
+            std::cout << "[Session][on shutdown] fail\n";
+            return;
+        }
+           
+
+        // At this point the connection is closed gracefully
+    }
 
     void getRequest()
     {
+
         std::cout << "[Session] Getting request\n";
         std::shared_ptr<boost::beast::http::request<boost::beast::http::dynamic_body>> request = std::make_shared<boost::beast::http::request<boost::beast::http::dynamic_body>>();
         std::shared_ptr<boost::beast::flat_buffer> buffer = std::make_shared<boost::beast::flat_buffer>();
         std::shared_ptr<boost::beast::http::request_parser<boost::beast::http::dynamic_body>> parser = std::make_shared<boost::beast::http::request_parser<boost::beast::http::dynamic_body>>();
         parser->body_limit(10 * 1024 * 1024);
-        std::cout << "[Session] Getting request\n";
+
+        std::cout << "[Session] before async read\n";
         boost::beast::http::async_read(
-            m_socket,
+            *m_socket,
             *buffer,
             *parser,
-            [self = shared_from_this(), request, buffer, parser](const boost::system::error_code& ec, std::size_t)
+            [self = shared_from_this(), request, buffer, parser, this](const boost::system::error_code& ec, std::size_t)
             {
                 if (ec)
                 {
@@ -129,6 +431,15 @@ private:
                 if (request->target() != "/upload")
                 {
                     self->printRequest(request);
+                }
+                if (request->target() == "/login")
+                {
+                    std::cout << "Login header is \n";
+                    for (auto const& h : request->base())
+                    {
+                        std::cout << h.name_string() << ": " << h.value() << "\n";
+                    }
+
                 }
                 //if ((request->target() == "/") && (request->base()["Cookie"] == ""))
                 //{
@@ -221,13 +532,13 @@ private:
                     }
                 }
 
-
+ 
                 self->processRequest(request);
             }
         );
     }
 
-    //if session fill true, else false
+    
     bool checkSession(std::shared_ptr<boost::beast::http::request<boost::beast::http::dynamic_body>> request)
     {
         boost::beast::http::fields::iterator sessionIt = request->find(boost::beast::http::field::cookie);
@@ -240,6 +551,40 @@ private:
         {
             return true;
         }
+    }
+
+    void printRequest(boost::beast::http::request<boost::beast::http::dynamic_body> request)
+    {
+        std::cout << "\n========== HTTP REQUEST ==========\n";
+        std::cout << "Method       : " << request.method_string() << "\n";
+        std::cout << "Target       : " << request.target() << "\n";
+        std::cout << "Version      : " << (request.version() == 11 ? "HTTP/1.1" : "HTTP/1.0") << "\n";
+        std::cout << "Keep-Alive   : " << (request.keep_alive() ? "yes" : "no") << "\n";
+
+
+        std::cout << "\n--- Headers ---\n";
+        //std::string sessionValue = request->find();
+        boost::beast::http::fields::iterator Authentification = request.find(boost::beast::http::field::authorization);
+
+        if (Authentification != request.end())
+        {
+            std::cout << "Authentification output: " << Authentification->name_string() << "\n";
+        }
+
+        for (auto const& h : request.base())
+        {
+            std::cout << h.name_string() << ": " << h.value() << "\n";
+        }
+
+        std::string body = boost::beast::buffers_to_string(request.body().data());
+
+        std::cout << "\n--- Body (" << body.size() << " bytes) ---\n";
+        if (!body.empty())
+            std::cout << body << "\n";
+        else
+            std::cout << "<empty>\n";
+
+        std::cout << "==================================\n\n";
     }
 
     void printRequest(std::shared_ptr<boost::beast::http::request<boost::beast::http::dynamic_body>> request)
@@ -473,7 +818,7 @@ private:
             res->prepare_payload();
 
             boost::beast::http::async_write(
-                m_socket,
+                *m_socket,
                 *res,
                 [self = shared_from_this(), res, request](boost::system::error_code ec, std::size_t bytes_transfferd)
                 {
@@ -550,7 +895,7 @@ private:
         res->prepare_payload();
 
         boost::beast::http::async_write(
-            m_socket,
+            *m_socket,
             *res,
             [self = shared_from_this(), res](const boost::beast::error_code& ec, size_t bytes_trasnferred)
             {
@@ -569,7 +914,7 @@ private:
                 {
                     
                     boost::system::error_code shutdown_ec;
-                    self->m_socket.shutdown(boost::asio::ip::tcp::socket::shutdown_both, shutdown_ec);
+                    self->m_socket->shutdown(boost::asio::ip::tcp::socket::shutdown_both, shutdown_ec);
                 }
             }
         );
@@ -622,7 +967,7 @@ private:
         res->keep_alive(request->keep_alive());
 
         boost::beast::http::async_write(
-            m_socket,
+            *m_socket,
             *res,
             [self = shared_from_this(), res](const boost::beast::error_code& ec, size_t bytes_trasnferred)
             {
@@ -637,7 +982,7 @@ private:
                 else
                 {
                     boost::system::error_code shutdown_ec;
-                    self->m_socket.shutdown(boost::asio::ip::tcp::socket::shutdown_both, shutdown_ec);
+                    self->m_socket->shutdown(boost::asio::ip::tcp::socket::shutdown_both, shutdown_ec);
                 }
             }
         );
@@ -777,8 +1122,8 @@ private:
         res->prepare_payload();
 
 
-        std::cout << "\n\n";
-        boost::beast::http::async_write(m_socket, *res, [self = shared_from_this(), res, request](boost::system::error_code ec, std::size_t bytes_transfferd)
+        std::cout << "[Session][login] async_write\n\n";
+        /*boost::beast::http::async_write(*m_socket, *res, [self = shared_from_this(), res, request](boost::system::error_code ec, std::size_t bytes_transfferd)
             {
                 if (!ec && res->keep_alive())
                 {
@@ -788,7 +1133,10 @@ private:
                 {
                     std::cerr << "async_write error: " << ec.message() << "\n";
                 }
-            });
+            });*/
+
+      //boost::beast::async_write(m_stream, std::move(msg), boost::beast::bind_front_handler(&Session::on_write, this->shared_from_this(), keep_alive));
+        boost::beast::async_write(m_stream, boost::beast::http::message_generator(std::move(*res)), boost::beast::bind_front_handler(&Session::on_write, this->shared_from_this(), true)); //keep-alive check
     }
 
     void registration(std::shared_ptr<boost::beast::http::request<boost::beast::http::dynamic_body>> request)
@@ -838,7 +1186,7 @@ private:
         res->keep_alive(request->keep_alive());
         res->prepare_payload();
 
-        boost::beast::http::async_write(m_socket, *res, [self = shared_from_this(), res, request](boost::system::error_code ec, std::size_t bytes_transfferd)
+        boost::beast::http::async_write(*m_socket, *res, [self = shared_from_this(), res, request](boost::system::error_code ec, std::size_t bytes_transfferd)
             {
                 if (!ec && res->keep_alive())
                 {
@@ -877,7 +1225,7 @@ private:
         res->set(boost::beast::http::field::set_cookie, guestLogaoutToken.token);
 
         boost::beast::http::async_write(
-            m_socket,
+            *m_socket,
             *res,
             [self = shared_from_this(), res](const boost::beast::error_code& ec, size_t bytes_transferred)
             {
@@ -1033,7 +1381,7 @@ private:
         res->prepare_payload();
         std::cout << "_______________________LOG__________________________________\n";
         boost::beast::http::async_write(
-            m_socket,
+            *m_socket,
             *res,
             [self = shared_from_this(), res](boost::system::error_code ec, std::size_t)
             {
@@ -1117,7 +1465,7 @@ private:
         res->prepare_payload();
 
         boost::beast::http::async_write(
-            m_socket,
+            *m_socket,
             *res,
             [self = shared_from_this(), res, request](const boost::system::error_code& ec, std::size_t bytes_transferred)
             {
@@ -1211,7 +1559,7 @@ private:
                 res->prepare_payload();
                 std::cout << "_______________________LOG__________________________________\n";
                 boost::beast::http::async_write(
-                    m_socket,
+                    *m_socket,
                     *res,
                     [self = shared_from_this(), res](const boost::system::error_code& ec, std::size_t bytes_transferred)
                     {
@@ -1242,7 +1590,7 @@ private:
                 res->prepare_payload();
 
                 boost::beast::http::async_write(
-                    m_socket,
+                    *m_socket,
                     *res,
                     [self = shared_from_this(), res](boost::system::error_code ec, std::size_t bytes_transferred)
                     {
@@ -1266,7 +1614,7 @@ private:
             res->prepare_payload();
 
             boost::beast::http::async_write(
-                m_socket,
+                *m_socket,
                 *res,
                 [self = shared_from_this(), res](const boost::system::error_code& ec, std::size_t bytes_transferred)
                 {
@@ -1320,7 +1668,7 @@ private:
             res->body() = "File not found\n";
             res->prepare_payload();
             boost::beast::http::async_write(
-                m_socket,
+                *m_socket,
                 *res,
                 [self = shared_from_this(), res](const boost::system::error_code& ec, std::size_t bytes_transferred)
                 {
@@ -1348,7 +1696,7 @@ private:
             res->body() = "File not opened\n";
             res->prepare_payload();
             boost::beast::http::async_write(
-                m_socket,
+                *m_socket,
                 *res,
                 [self = shared_from_this(), res](const boost::system::error_code& ec, std::size_t bytes_transferred)
                 {
@@ -1419,7 +1767,7 @@ private:
         res->prepare_payload();
 
         boost::beast::http::async_write(
-            m_socket,
+            *m_socket,
             *res,
             [self = shared_from_this(), res](const boost::system::error_code& ec, std::size_t bytes_transferred)
             {

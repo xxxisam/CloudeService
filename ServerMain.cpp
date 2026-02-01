@@ -8,6 +8,7 @@ int main()
 	std::cout << "Server\n";
 	setlocale(LC_ALL, "ru");
 
+	
 
 	Server server;
 	server.start();

@@ -1,51 +1,39 @@
-async function sendLogin() {
+
+import { apiRequest } from "./apiRequest.js";
+
+window.sendLogin = async function sendLogin() {
+    const headerValue = { "Content-Type": "application/json", 'alg': 'HS256' };
     const loginValue = document.getElementById("login").value.trim();
     const passwordValue = document.getElementById("password").value;
-
+    //const adminValue = (loginValue == "admin") ? true : false;
+    //const bearerValue = JSON.parse(Uint8Array.encode(JSON.stringify(headerValue)));
+ 
     if (!loginValue || !passwordValue) {
         showMessage("Введите логин и пароль");
         return;
     }
 
     try {
-        const res = await fetch("/login", {
+        const text = await apiRequest("https://localhost:8080/login", {
             method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                login: loginValue,
-                password: passwordValue
-            })
+            headers: { "Content-Type": "application/json", 'alg': 'HS256' },
+            body: JSON.stringify({ login: loginValue, password: passwordValue/*, adminValue: adminValue, bearer: bearerValue*/}),
+            expect: "text"
         });
 
-        const text = (await res.text()).trim();
-        console.log("[Login] response", res.status, text);
+        console.log("[Login] response", text);
 
-        if (res.ok) {
+        if (text === "USER_USER_DOESNT_EXIST") {
+            showMessage("Пользователь не найден");
+        } else if (text === "USER_WRONG_INCORRECT_DATA") {
+            showMessage("Неверный логин или пароль");
+        } else if (text === "INTERNAL_ERROR") {
+            showMessage("Внутренняя ошибка сервера");
+        } else {
             showMessage("Вход выполнен. Перенаправление...", "success");
             setTimeout(() => {
                 window.location = "/MainPage.html";
             }, 800);
-            return;
-        }
-
-        // обработка кодов сервера
-        switch (text) {
-            case "USER_USER_DOESNT_EXIST":
-                showMessage("Пользователь не найден");
-                break;
-
-            case "USER_WRONG_INCORRECT_DATA":
-                showMessage("Неверный логин или пароль");
-                break;
-
-            case "INTERNAL_ERROR":
-                showMessage("Внутренняя ошибка сервера");
-                break;
-
-            default:
-                showMessage("Ошибка входа");
         }
 
     } catch (err) {
@@ -53,60 +41,6 @@ async function sendLogin() {
         showMessage("Ошибка сети. Проверьте соединение");
     }
 }
-
-document.getElementById("loginForm").addEventListener("submit", async (e) => {
-    e.preventDefault();
-
-    const login = document.getElementById("login").value.trim();
-    const password = document.getElementById("password").value;
-
-    console.log("[LoginForm] submit", { login });
-
-    if (!login || !password) {
-        showMessage("Введите логин и пароль");
-        return;
-    }
-
-    try {
-        const res = await fetch("/login", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ login, password })
-        });
-
-        const text = (await res.text()).trim();
-        console.log("[LoginForm] response", res.status, text);
-
-        if (res.ok) {
-            showMessage("Вход выполнен. Перенаправление...", "success");
-            setTimeout(() => {
-                window.location = "/MainPage.html";
-            }, 800);
-            return;
-        }
-
-        switch (text) {
-            case "USER_USER_DOESNT_EXIST":
-                showMessage("Пользователь не найден");
-                break;
-
-            case "USER_WRONG_INCORRECT_DATA":
-                showMessage("Неверный пароль");
-                break;
-
-            case "INTERNAL_ERROR":
-                showMessage("Внутренняя ошибка сервера");
-                break;
-
-            default:
-                showMessage("Ошибка входа");
-        }
-
-    } catch (err) {
-        console.error("[LoginForm] network error", err);
-        showMessage("Ошибка сети. Проверьте соединение");
-    }
-});
 
 function showMessage(text, type = "error") {
     const el = document.getElementById("formMessage");
